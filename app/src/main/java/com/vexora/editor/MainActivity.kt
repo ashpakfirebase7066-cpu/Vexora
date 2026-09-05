@@ -4,6 +4,7 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,13 +19,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -40,12 +37,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
-import androidx.compose.ui.viewinterop.AndroidView
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,6 +54,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun VexoraEditor() {
+    val context = LocalContext.current
     val clips = remember { mutableStateListOf<Uri>() }
     var selected by remember { mutableStateOf(0) }
     var playing by remember { mutableStateOf(false) }
@@ -67,10 +66,11 @@ fun VexoraEditor() {
         clips.clear()
         clips.addAll(uris)
         selected = 0
+        playing = false
     }
 
     val player = remember(clips.toList()) {
-        ExoPlayer.Builder(androidx.compose.ui.platform.LocalContext.current).build().also { p ->
+        ExoPlayer.Builder(context).build().also { p ->
             clips.forEach { p.addMediaItem(MediaItem.fromUri(it)) }
             p.prepare()
         }
@@ -89,7 +89,11 @@ fun VexoraEditor() {
             } else {
                 Spacer(Modifier.height(8.dp))
             }
-            Text(if (clips.isEmpty()) "Import a video to start editing" else "${clips.size} clip(s) • Clip ${selected + 1}", color = Color.LightGray, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+            Text(
+                if (clips.isEmpty()) "Import a video to start editing" else "${clips.size} clip(s) • Clip ${selected + 1}",
+                color = Color.LightGray,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+            )
             ToolBar(
                 onPlay = { playing = !playing; if (playing) player.play() else player.pause() },
                 onImport = { picker.launch("video/*") },
@@ -101,7 +105,10 @@ fun VexoraEditor() {
 
 @Composable
 private fun TopBar(onImport: () -> Unit) {
-    Row(Modifier.fillMaxWidth().height(58.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier.fillMaxWidth().height(58.dp).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Text("Vexora", color = Color.White, fontSize = 21.sp, modifier = Modifier.weight(1f))
         TextButton(onClick = onImport) { Text("+ Media", color = Color.White) }
         Button(onClick = {}) { Text("Export") }
@@ -128,18 +135,30 @@ private fun Preview(player: ExoPlayer, modifier: Modifier) {
 @Composable
 private fun Timeline(count: Int, selected: Int, onSelect: (Int) -> Unit) {
     Column(Modifier.fillMaxWidth().background(Color(0xFF111111)).padding(vertical = 10.dp)) {
-        Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
             if (count == 0) {
-                Box(Modifier.width(260.dp).height(72.dp).background(Color(0xFF202020)), contentAlignment = Alignment.Center) { Text("Video Track", color = Color.Gray) }
+                Box(
+                    Modifier.width(260.dp).height(72.dp).background(Color(0xFF202020)),
+                    contentAlignment = Alignment.Center
+                ) { Text("Video Track", color = Color.Gray) }
             } else {
                 repeat(count) { i ->
-                    Box(Modifier.width(120.dp).height(72.dp).background(if (i == selected) Color(0xFF353535) else Color(0xFF202020)).clickable { onSelect(i) }, contentAlignment = Alignment.Center) {
-                        Text("Clip ${i + 1}", color = Color.White)
-                    }
+                    Box(
+                        Modifier.width(120.dp).height(72.dp)
+                            .background(if (i == selected) Color(0xFF353535) else Color(0xFF202020))
+                            .clickable { onSelect(i) },
+                        contentAlignment = Alignment.Center
+                    ) { Text("Clip ${i + 1}", color = Color.White) }
                 }
             }
         }
-        Row(Modifier.padding(top = 6.dp, start = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            Modifier.padding(top = 6.dp, start = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             TrackLabel("VIDEO")
             TrackLabel("AUDIO")
             TrackLabel("TEXT")
@@ -148,12 +167,28 @@ private fun Timeline(count: Int, selected: Int, onSelect: (Int) -> Unit) {
 }
 
 @Composable
-private fun TrackLabel(text: String) { Text(text, color = Color.Gray, fontSize = 10.sp, modifier = Modifier.background(Color(0xFF1B1B1B)).padding(horizontal = 8.dp, vertical = 4.dp)) }
+private fun TrackLabel(text: String) {
+    Text(
+        text,
+        color = Color.Gray,
+        fontSize = 10.sp,
+        modifier = Modifier.background(Color(0xFF1B1B1B)).padding(horizontal = 8.dp, vertical = 4.dp)
+    )
+}
 
 @Composable
-private fun PropertyPanel(title: String, value: Float, min: Float, max: Float, onChange: (Float) -> Unit) {
+private fun PropertyPanel(
+    title: String,
+    value: Float,
+    min: Float,
+    max: Float,
+    onChange: (Float) -> Unit
+) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) { Text(title, color = Color.White, modifier = Modifier.weight(1f)); Text(String.format("%.2f", value), color = Color.Gray) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(title, color = Color.White, modifier = Modifier.weight(1f))
+            Text(String.format("%.2f", value), color = Color.Gray)
+        }
         Slider(value = value, onValueChange = onChange, valueRange = min..max)
     }
 }
@@ -161,16 +196,27 @@ private fun PropertyPanel(title: String, value: Float, min: Float, max: Float, o
 @Composable
 private fun ToolBar(onPlay: () -> Unit, onImport: () -> Unit, onTool: (String) -> Unit) {
     val tools = listOf("Split", "Trim", "Text", "Music", "Speed", "Volume", "Filter")
-    Row(Modifier.fillMaxWidth().height(82.dp).background(Color(0xFF101010)).horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(
+        Modifier.fillMaxWidth().height(82.dp).background(Color(0xFF101010))
+            .horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
         Tool("▶", "Play", onPlay)
-        tools.forEach { name -> Tool("•", name) { if (name == "Speed" || name == "Volume") onTool(name) } }
+        tools.forEach { name ->
+            Tool("•", name) { if (name == "Speed" || name == "Volume") onTool(name) }
+        }
         Tool("+", "Media", onImport)
     }
 }
 
 @Composable
 private fun Tool(icon: String, label: String, onClick: () -> Unit) {
-    Column(Modifier.width(68.dp).fillMaxHeight().clickable { onClick() }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+    Column(
+        Modifier.width(68.dp).fillMaxHeight().clickable { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
         Text(icon, color = Color.White, fontSize = 20.sp)
         Text(label, color = Color.LightGray, fontSize = 11.sp)
     }
