@@ -13,8 +13,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,7 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.weight as layoutWeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -174,7 +174,7 @@ private fun TopEditorBar(onBack: () -> Unit, onImport: () -> Unit, onExport: () 
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text("‹", color = Color.White, fontSize = 34.sp, modifier = Modifier.clickable { onBack() }.padding(end = 14.dp))
-        Text("Vexora", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+        Text("Vexora", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.layoutWeight(1f))
         Text("Original ▾", color = Soft, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 16.dp))
         Text("⋯", color = Color.White, fontSize = 25.sp, modifier = Modifier.padding(horizontal = 10.dp))
         TextButton(onClick = onImport) { Text("＋", color = Color.White, fontSize = 18.sp) }
@@ -186,7 +186,7 @@ private fun TopEditorBar(onBack: () -> Unit, onImport: () -> Unit, onExport: () 
 
 @Composable
 private fun PreviewArea(player: ExoPlayer, playing: Boolean, onPlay: () -> Unit) {
-    Box(Modifier.fillMaxWidth().weight(1f).background(Color.Black), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxWidth().layoutWeight(1f).background(Color.Black), contentAlignment = Alignment.Center) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { context ->
@@ -220,7 +220,7 @@ private fun TimelineEditor(
     Column(Modifier.fillMaxWidth().height(245.dp).background(Color(0xFF15161A))) {
         Row(Modifier.fillMaxWidth().height(34.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(if (count == 0) "0:00 / 0:00" else "0:00 / 0:03", color = Soft, fontSize = 11.sp)
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.layoutWeight(1f))
             Text("↶", color = Soft, fontSize = 22.sp, modifier = Modifier.padding(horizontal = 8.dp))
             Text("↷", color = Soft, fontSize = 22.sp, modifier = Modifier.padding(horizontal = 8.dp))
         }
@@ -232,7 +232,7 @@ private fun TimelineEditor(
                 Spacer(Modifier.height(6.dp))
                 TrackAction("▣+", "Video", onAdd)
             }
-            Box(Modifier.weight(1f).fillMaxHeight()) {
+            Box(Modifier.layoutWeight(1f).fillMaxHeight()) {
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (count == 0) TimelineClip("Add video", false, onAdd)
                     else repeat(count) { index -> TimelineClip("Clip ${index + 1}", index == selected) { onSelect(index) } }
@@ -258,7 +258,7 @@ private fun TrackAction(icon: String, label: String, onClick: () -> Unit) {
 private fun TimelineClip(title: String, selected: Boolean, onClick: () -> Unit) {
     Column(Modifier.width(118.dp).height(76.dp).clip(RoundedCornerShape(5.dp)).background(if (selected) Color(0xFF353840) else Panel2).border(1.dp, if (selected) Color.White else Color.Transparent, RoundedCornerShape(5.dp)).clickable { onClick() }) {
         Row(Modifier.fillMaxWidth().height(58.dp)) {
-            repeat(3) { Box(Modifier.weight(1f).fillMaxHeight().padding(1.dp).background(Color(0xFF2A2C31))) }
+            repeat(3) { Box(Modifier.layoutWeight(1f).fillMaxHeight().padding(1.dp).background(Color(0xFF2A2C31))) }
         }
         Text(title, color = Color.White, fontSize = 9.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
     }
@@ -268,7 +268,7 @@ private fun TimelineClip(title: String, selected: Boolean, onClick: () -> Unit) 
 private fun PropertyStrip(title: String, value: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit) {
     Row(Modifier.fillMaxWidth().height(54.dp).background(Panel).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(title, color = Color.White, modifier = Modifier.width(70.dp))
-        Slider(value = value, onValueChange = onChange, valueRange = range, modifier = Modifier.weight(1f))
+        Slider(value = value, onValueChange = onChange, valueRange = range, modifier = Modifier.layoutWeight(1f))
         Text(String.format("%.2f", value), color = Soft, fontSize = 11.sp, modifier = Modifier.width(42.dp))
     }
 }
