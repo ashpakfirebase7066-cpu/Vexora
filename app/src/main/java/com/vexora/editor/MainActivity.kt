@@ -11,10 +11,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -180,7 +180,6 @@ private fun TopBar(onBack: () -> Unit, onImport: () -> Unit, onExport: () -> Uni
 private fun Preview(player: ExoPlayer, playing: Boolean, onPlay: () -> Unit) {
     Box(Modifier.fillMaxWidth().height(320.dp).background(Color.Black), contentAlignment = Alignment.Center) {
         AndroidView(
-            Modifier.fillMaxSize(),
             factory = { context ->
                 PlayerView(context).apply {
                     this.player = player
@@ -189,6 +188,7 @@ private fun Preview(player: ExoPlayer, playing: Boolean, onPlay: () -> Unit) {
                     setShutterBackgroundColor(android.graphics.Color.BLACK)
                 }
             },
+            modifier = Modifier.fillMaxSize(),
             update = { it.player = player }
         )
         if (!playing) {
@@ -201,13 +201,7 @@ private fun Preview(player: ExoPlayer, playing: Boolean, onPlay: () -> Unit) {
 }
 
 @Composable
-private fun Timeline(
-    count: Int,
-    selected: Int,
-    onSelect: (Int) -> Unit,
-    onAdd: () -> Unit,
-    onAction: (String) -> Unit
-) {
+private fun Timeline(count: Int, selected: Int, onSelect: (Int) -> Unit, onAdd: () -> Unit, onAction: (String) -> Unit) {
     Column(Modifier.fillMaxWidth().height(190.dp).background(Color(0xFF15161A))) {
         Row(Modifier.fillMaxWidth().height(32.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(if (count == 0) "0:00 / 0:00" else "0:00 / 0:03", color = Soft, fontSize = 11.sp)
@@ -227,10 +221,7 @@ private fun Timeline(
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (count == 0) ClipBlock("Add video", false, onAdd)
                     else repeat(count) { index -> ClipBlock("Clip ${index + 1}", index == selected) { onSelect(index) } }
-                    Box(
-                        Modifier.width(54.dp).height(76.dp).border(1.dp, Color(0xFF34363D), RoundedCornerShape(5.dp)).clickable { onAdd() },
-                        contentAlignment = Alignment.Center
-                    ) { Text("+", color = Color.White, fontSize = 28.sp) }
+                    Box(Modifier.width(54.dp).height(76.dp).border(1.dp, Color(0xFF34363D), RoundedCornerShape(5.dp)).clickable { onAdd() }, contentAlignment = Alignment.Center) { Text("+", color = Color.White, fontSize = 28.sp) }
                 }
                 Box(Modifier.width(2.dp).height(84.dp).background(Color.White).align(Alignment.CenterHorizontally))
             }
@@ -248,12 +239,7 @@ private fun TrackButton(icon: String, label: String, onClick: () -> Unit) {
 
 @Composable
 private fun ClipBlock(title: String, selected: Boolean, onClick: () -> Unit) {
-    Column(
-        Modifier.width(118.dp).height(76.dp)
-            .background(if (selected) Color(0xFF353840) else Panel2, RoundedCornerShape(5.dp))
-            .border(1.dp, if (selected) Color.White else Color.Transparent, RoundedCornerShape(5.dp))
-            .clickable { onClick() }
-    ) {
+    Column(Modifier.width(118.dp).height(76.dp).background(if (selected) Color(0xFF353840) else Panel2, RoundedCornerShape(5.dp)).border(1.dp, if (selected) Color.White else Color.Transparent, RoundedCornerShape(5.dp)).clickable { onClick() }) {
         Row(Modifier.fillMaxWidth().height(56.dp)) {
             Box(Modifier.width(39.dp).fillMaxHeight().padding(1.dp).background(Color(0xFF2A2C31)))
             Box(Modifier.width(39.dp).fillMaxHeight().padding(1.dp).background(Color(0xFF34363C)))
@@ -274,27 +260,11 @@ private fun PropertyBar(title: String, value: Float, range: ClosedFloatingPointR
 
 @Composable
 private fun ToolBar(selected: String, onTool: (String) -> Unit) {
-    val tools = listOf(
-        "Filter" to "◌", "Trim" to "◈", "FX" to "☆", "Split" to "✂", "Flow" to "F",
-        "Cutout" to "◉", "Crop" to "⌗", "Rotate" to "↻", "Mirror" to "◫", "Flip" to "▱",
-        "Fit" to "⌑", "BG" to "▨", "Border" to "□", "Blur" to "▒", "Opacity" to "◉",
-        "Zoom" to "↗", "TTS" to "A", "Mosaic" to "▦", "Magnifier" to "⊕", "Stories" to "▤", "Overlay Track" to "⇄",
-        "Volume" to "🔊", "Speed" to "1x"
-    )
-    Row(
-        Modifier.fillMaxWidth().height(88.dp).background(Color(0xFF101114)).horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    val tools = listOf("Filter" to "◌", "Trim" to "◈", "FX" to "☆", "Split" to "✂", "Flow" to "F", "Cutout" to "◉", "Crop" to "⌗", "Rotate" to "↻", "Mirror" to "◫", "Flip" to "▱", "Fit" to "⌑", "BG" to "▨", "Border" to "□", "Blur" to "▒", "Opacity" to "◉", "Zoom" to "↗", "TTS" to "A", "Mosaic" to "▦", "Magnifier" to "⊕", "Stories" to "▤", "Overlay Track" to "⇄", "Volume" to "🔊", "Speed" to "1x")
+    Row(Modifier.fillMaxWidth().height(88.dp).background(Color(0xFF101114)).horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         tools.forEach { (name, icon) ->
-            Column(
-                Modifier.width(64.dp).height(78.dp).clickable { onTool(name) }.padding(3.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Box(
-                    Modifier.size(34.dp).background(if (name == selected) Color(0xFF2D3037) else Color.Transparent, RoundedCornerShape(8.dp)),
-                    contentAlignment = Alignment.Center
-                ) { Text(icon, color = Color.White, fontSize = 19.sp) }
+            Column(Modifier.width(64.dp).height(78.dp).clickable { onTool(name) }.padding(3.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                Box(Modifier.size(34.dp).background(if (name == selected) Color(0xFF2D3037) else Color.Transparent, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) { Text(icon, color = Color.White, fontSize = 19.sp) }
                 Text(name, color = if (name == selected) Color.White else Soft, fontSize = 9.sp, maxLines = 2)
             }
         }
