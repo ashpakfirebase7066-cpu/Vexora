@@ -13,8 +13,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -41,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,10 +52,11 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 
-private val Bg = Color(0xFF111216)
-private val Panel = Color(0xFF17181D)
-private val Panel2 = Color(0xFF202229)
-private val Soft = Color(0xFF9A9CA5)
+private val Background = Color(0xFF0D0E11)
+private val SurfaceDark = Color(0xFF15171B)
+private val SurfaceLight = Color(0xFF202329)
+private val Muted = Color(0xFF9699A3)
+private val Accent = Color(0xFF2F8CFF)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,9 +69,9 @@ class MainActivity : ComponentActivity() {
 fun VexoraEditor() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val clips = remember { mutableStateListOf<Uri>() }
-    var selected by remember { mutableStateOf(0) }
+    var selectedClip by remember { mutableStateOf(0) }
     var playing by remember { mutableStateOf(false) }
-    var tool by remember { mutableStateOf("Edit") }
+    var selectedTool by remember { mutableStateOf("Edit") }
     var volume by remember { mutableFloatStateOf(1f) }
     var speed by remember { mutableFloatStateOf(1f) }
     var dialog by remember { mutableStateOf<String?>(null) }
@@ -77,77 +80,283 @@ fun VexoraEditor() {
         if (uris.isNotEmpty()) {
             clips.clear()
             clips.addAll(uris)
-            selected = 0
+            selectedClip = 0
             playing = false
         }
     }
 
     val player = remember(clips.toList()) {
-        ExoPlayer.Builder(context).build().also { p ->
-            clips.forEach { p.addMediaItem(MediaItem.fromUri(it)) }
-            p.prepare()
+        ExoPlayer.Builder(context).build().also { exo ->
+            clips.forEach { exo.addMediaItem(MediaItem.fromUri(it)) }
+            exo.prepare()
         }
     }
     DisposableEffect(player) { onDispose { player.release() } }
 
     dialog?.let { message ->
-        AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Vexora") }, text = { Text(message) }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("OK") } })
+        AlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text("Vexora Editor") },
+            text = { Text(message) },
+            confirmButton = { TextButton(onClick = { dialog = null }) { Text("OK") } }
+        )
     }
 
-    Surface(Modifier.fillMaxSize(), color = Bg) {
+    Surface(Modifier.fillMaxSize(), color = Background) {
         Column(Modifier.fillMaxSize()) {
-            TopBar({ dialog = "Back to projects" }, { picker.launch("video/*") }, { dialog = "Export options: 720p, 1080p and 4K." })
-            Preview(player, playing) { playing = !playing; if (playing) player.play() else player.pause() }
-            Timeline(clips.size, selected, { index -> selected = index; player.seekTo(index, 0L); player.pause(); playing = false }, { picker.launch("video/*") }) { action ->
-                dialog = when (action) { "Text" -> "Text layer controls opened."; "Music" -> "Choose an audio file from your device."; "Overlay" -> "Choose an image overlay."; else -> "$action controls opened." }
+            EditorTopBar(
+                onBack = { dialog = "Back to projects" },
+                onImport = { picker.launch("video/*") },
+                onExport = { dialog = "Export is ready for the next render module." }
+            )
+
+            PreviewPanel(
+                player = player,
+                playing = playing,
+                onPlay = {
+                    playing = !playing
+                    if (playing) player.play() else player.pause()
+                }
+            )
+
+            PlaybackBar(player = player, playing = playing) {
+                playing = !playing
+                if (playing) player.play() else player.pause()
             }
-            if (tool == "Volume" || tool == "Speed") {
-                PropertyBar(tool, if (tool == "Volume") volume else speed, if (tool == "Volume") 0f..2f else 0.25f..4f) { value ->
-                    if (tool == "Volume") { volume = value; player.volume = value } else { speed = value; player.setPlaybackSpeed(value) }
+
+            TimelinePanel(
+                clipCount = clips.size,
+                selectedClip = selectedClip,
+                onSelectClip = { index ->
+                    selectedClip = index
+                    player.seekTo(index, 0L)
+                    player.pause()
+                    playing = false
+                },
+                onAddClip = { picker.launch("video/*") },
+                onAction = { action -> dialog = "$action controls opened." }
+            )
+
+            if (selectedTool == "Volume" || selectedTool == "Speed") {
+                val isVolume = selectedTool == "Volume"
+                PropertyPanel(
+                    title = selectedTool,
+                    value = if (isVolume) volume else speed,
+                    range = if (isVolume) 0f..2f else 0.25f..4f
+                ) { value ->
+                    if (isVolume) {
+                        volume = value
+                        player.volume = value
+                    } else {
+                        speed = value
+                        player.setPlaybackSpeed(value)
+                    }
                 }
             }
-            ToolBar(tool) { name -> tool = name; if (name != "Edit" && name != "Volume" && name != "Speed") dialog = "$name controls opened." }
-        }
-    }
-}
 
-@Composable
-private fun TopBar(onBack: () -> Unit, onImport: () -> Unit, onExport: () -> Unit) {
-    Row(Modifier.fillMaxWidth().height(52.dp).background(Color(0xFF15161A)).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("‹", color = Color.White, fontSize = 34.sp, modifier = Modifier.clickable { onBack() }.padding(end = 14.dp))
-        Text("Vexora", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.width(24.dp)); Text("Original ▾", color = Soft, fontSize = 12.sp); Spacer(Modifier.width(18.dp)); Text("⋯", color = Color.White, fontSize = 25.sp); Spacer(Modifier.width(12.dp))
-        TextButton(onClick = onImport) { Text("＋", color = Color.White, fontSize = 18.sp) }
-        Button(onClick = onExport, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C8CFF)), shape = RoundedCornerShape(6.dp)) { Text("Export", color = Color.White) }
-    }
-}
-
-@Composable
-private fun Preview(player: ExoPlayer, playing: Boolean, onPlay: () -> Unit) {
-    Box(Modifier.fillMaxWidth().height(320.dp).background(Color.Black), contentAlignment = Alignment.Center) {
-        AndroidView(factory = { context -> PlayerView(context).apply { this.player = player; useController = false; setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING); setShutterBackgroundColor(android.graphics.Color.BLACK) } }, modifier = Modifier.fillMaxSize(), update = { it.player = player })
-        if (!playing) Box(Modifier.size(54.dp).background(Color(0x99000000), RoundedCornerShape(27.dp)).clickable { onPlay() }, contentAlignment = Alignment.Center) { Text("▶", color = Color.White, fontSize = 22.sp) }
-    }
-}
-
-@Composable
-private fun Timeline(count: Int, selected: Int, onSelect: (Int) -> Unit, onAdd: () -> Unit, onAction: (String) -> Unit) {
-    Column(Modifier.fillMaxWidth().height(190.dp).background(Color(0xFF15161A))) {
-        Row(Modifier.fillMaxWidth().height(32.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) { Text(if (count == 0) "0:00 / 0:00" else "0:00 / 0:03", color = Soft, fontSize = 11.sp); Spacer(Modifier.width(24.dp)); Text("↶", color = Soft, fontSize = 20.sp); Spacer(Modifier.width(12.dp)); Text("↷", color = Soft, fontSize = 20.sp) }
-        Row(Modifier.fillMaxWidth().height(158.dp)) {
-            Column(Modifier.width(150.dp).fillMaxHeight().padding(start = 10.dp)) { TrackButton("♫+", "Music") { onAction("Music") }; TrackButton("T+", "Subtitle") { onAction("Text") }; TrackButton("▧+", "Sticker / Overlay") { onAction("Overlay") }; TrackButton("▣+", "Video") { onAdd() } }
-            Column(Modifier.fillMaxWidth().fillMaxHeight().padding(top = 10.dp)) {
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) { if (count == 0) ClipBlock("Add video", false, onAdd) else repeat(count) { index -> ClipBlock("Clip ${index + 1}", index == selected) { onSelect(index) } }; Box(Modifier.width(54.dp).height(76.dp).border(1.dp, Color(0xFF34363D), RoundedCornerShape(5.dp)).clickable { onAdd() }, contentAlignment = Alignment.Center) { Text("+", color = Color.White, fontSize = 28.sp) } }
-                Box(Modifier.width(2.dp).height(84.dp).background(Color.White).align(Alignment.CenterHorizontally))
+            EditorToolBar(selectedTool = selectedTool) { tool ->
+                selectedTool = tool
+                if (tool != "Edit" && tool != "Volume" && tool != "Speed") {
+                    dialog = "$tool controls opened."
+                }
             }
         }
     }
 }
 
-@Composable private fun TrackButton(icon: String, label: String, onClick: () -> Unit) { Row(Modifier.fillMaxWidth().height(38.dp).clickable { onClick() }.padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) { Text(icon, color = Color.White, fontSize = 16.sp, modifier = Modifier.width(34.dp)); Text(label, color = Soft, fontSize = 10.sp, maxLines = 1) } }
+@Composable
+private fun EditorTopBar(onBack: () -> Unit, onImport: () -> Unit, onExport: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().height(54.dp).background(SurfaceDark).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("‹", color = Color.White, fontSize = 36.sp, modifier = Modifier.clickable { onBack }.padding(end = 12.dp))
+        Text("Vexora", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.weight(1f))
+        Text("Original ▾", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(end = 14.dp))
+        Text("＋", color = Color.White, fontSize = 23.sp, modifier = Modifier.clickable { onImport }.padding(horizontal = 10.dp))
+        Button(
+            onClick = onExport,
+            colors = ButtonDefaults.buttonColors(containerColor = Accent),
+            shape = RoundedCornerShape(7.dp),
+            modifier = Modifier.height(38.dp)
+        ) { Text("Export", color = Color.White, fontWeight = FontWeight.Medium) }
+    }
+}
 
-@Composable private fun ClipBlock(title: String, selected: Boolean, onClick: () -> Unit) { Column(Modifier.width(118.dp).height(76.dp).background(if (selected) Color(0xFF353840) else Panel2, RoundedCornerShape(5.dp)).border(1.dp, if (selected) Color.White else Color.Transparent, RoundedCornerShape(5.dp)).clickable { onClick() }) { Row(Modifier.fillMaxWidth().height(56.dp)) { Box(Modifier.width(39.dp).fillMaxHeight().padding(1.dp).background(Color(0xFF2A2C31))); Box(Modifier.width(39.dp).fillMaxHeight().padding(1.dp).background(Color(0xFF34363C))); Box(Modifier.width(39.dp).fillMaxHeight().padding(1.dp).background(Color(0xFF292B30))) }; Text(title, color = Color.White, fontSize = 9.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)) } }
+@Composable
+private fun PreviewPanel(player: ExoPlayer, playing: Boolean, onPlay: () -> Unit) {
+    Box(
+        Modifier.fillMaxWidth().height(300.dp).background(Color.Black),
+        contentAlignment = Alignment.Center
+    ) {
+        AndroidView(
+            factory = { context ->
+                PlayerView(context).apply {
+                    this.player = player
+                    useController = false
+                    setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                    setShutterBackgroundColor(android.graphics.Color.BLACK)
+                }
+            },
+            modifier = Modifier.fillMaxSize(),
+            update = { it.player = player }
+        )
+        if (!playing) {
+            Box(
+                Modifier.size(58.dp).clip(CircleShape).background(Color(0x99000000)).clickable { onPlay() },
+                contentAlignment = Alignment.Center
+            ) { Text("▶", color = Color.White, fontSize = 24.sp) }
+        }
+    }
+}
 
-@Composable private fun PropertyBar(title: String, value: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit) { Row(Modifier.fillMaxWidth().height(54.dp).background(Panel).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) { Text(title, color = Color.White, modifier = Modifier.width(70.dp)); Slider(value = value, onValueChange = onChange, valueRange = range, modifier = Modifier.width(360.dp)); Text(String.format("%.2f", value), color = Soft, fontSize = 11.sp, modifier = Modifier.padding(start = 10.dp)) } }
+@Composable
+private fun PlaybackBar(player: ExoPlayer, playing: Boolean, onPlay: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().height(52.dp).background(SurfaceDark).padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("00:00 / 00:00", color = Color.White, fontSize = 12.sp)
+        Spacer(Modifier.weight(1f))
+        Text("|◀", color = Color.White, fontSize = 18.sp, modifier = Modifier.padding(horizontal = 12.dp))
+        Text(if (playing) "Ⅱ" else "▶", color = Color.White, fontSize = 21.sp, modifier = Modifier.clickable { onPlay() }.padding(horizontal = 12.dp))
+        Text("▶|", color = Color.White, fontSize = 18.sp, modifier = Modifier.padding(horizontal = 12.dp))
+        Spacer(Modifier.weight(1f))
+        Text("↶", color = Muted, fontSize = 22.sp, modifier = Modifier.padding(horizontal = 8.dp))
+        Text("↷", color = Muted, fontSize = 22.sp, modifier = Modifier.padding(horizontal = 8.dp))
+        Text("⛶", color = Color.White, fontSize = 19.sp, modifier = Modifier.padding(start = 8.dp))
+    }
+}
 
-@Composable private fun ToolBar(selected: String, onTool: (String) -> Unit) { val tools = listOf("Filter" to "◌", "Trim" to "◈", "FX" to "☆", "Split" to "✂", "Flow" to "F", "Cutout" to "◉", "Crop" to "⌗", "Rotate" to "↻", "Mirror" to "◫", "Flip" to "▱", "Fit" to "⌑", "BG" to "▨", "Border" to "□", "Blur" to "▒", "Opacity" to "◉", "Zoom" to "↗", "TTS" to "A", "Mosaic" to "▦", "Magnifier" to "⊕", "Stories" to "▤", "Overlay Track" to "⇄", "Volume" to "🔊", "Speed" to "1x"); Row(Modifier.fillMaxWidth().height(88.dp).background(Color(0xFF101114)).horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) { tools.forEach { (name, icon) -> Column(Modifier.width(64.dp).height(78.dp).clickable { onTool(name) }.padding(3.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) { Box(Modifier.size(34.dp).background(if (name == selected) Color(0xFF2D3037) else Color.Transparent, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) { Text(icon, color = Color.White, fontSize = 19.sp) }; Text(name, color = if (name == selected) Color.White else Soft, fontSize = 9.sp, maxLines = 2) } } } }
+@Composable
+private fun TimelinePanel(
+    clipCount: Int,
+    selectedClip: Int,
+    onSelectClip: (Int) -> Unit,
+    onAddClip: () -> Unit,
+    onAction: (String) -> Unit
+) {
+    Column(Modifier.fillMaxWidth().height(205.dp).background(SurfaceDark)) {
+        Row(
+            Modifier.fillMaxWidth().height(28.dp).padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("00:00", color = Muted, fontSize = 10.sp)
+            Spacer(Modifier.weight(1f))
+            Text("00:05     00:10     00:15     00:20", color = Muted, fontSize = 10.sp)
+        }
+
+        Row(Modifier.fillMaxWidth().weight(1f)) {
+            Column(Modifier.width(102.dp).fillMaxHeight().padding(start = 8.dp)) {
+                TrackButton("♫", "Music") { onAction("Music") }
+                TrackButton("T", "Text") { onAction("Text") }
+                TrackButton("◇", "Sticker") { onAction("Sticker") }
+                TrackButton("▣", "Video") { onAddClip() }
+            }
+
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 8.dp, end = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                if (clipCount == 0) {
+                    EmptyClip(onAddClip)
+                } else {
+                    repeat(clipCount) { index ->
+                        TimelineClip(
+                            label = "Clip ${index + 1}",
+                            selected = index == selectedClip,
+                            onClick = { onSelectClip(index) }
+                        )
+                    }
+                }
+                AddClip(onAddClip)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrackButton(icon: String, label: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().height(40.dp).clickable { onClick() }.padding(horizontal = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(icon, color = Color.White, fontSize = 18.sp, modifier = Modifier.width(30.dp))
+        Text(label, color = Muted, fontSize = 10.sp)
+    }
+}
+
+@Composable
+private fun TimelineClip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Column(
+        Modifier.width(118.dp).height(78.dp)
+            .clip(RoundedCornerShape(5.dp))
+            .background(if (selected) SurfaceLight else Color(0xFF191B20))
+            .border(1.dp, if (selected) Color.White else Color(0xFF2A2D34), RoundedCornerShape(5.dp))
+            .clickable { onClick() }
+    ) {
+        Row(Modifier.fillMaxWidth().height(57.dp)) {
+            repeat(3) { Box(Modifier.weight(1f).fillMaxHeight().padding(1.dp).background(Color(0xFF30333A))) }
+        }
+        Text(label, color = Color.White, fontSize = 9.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+    }
+}
+
+@Composable
+private fun EmptyClip(onClick: () -> Unit) {
+    Box(
+        Modifier.width(150.dp).height(78.dp).clip(RoundedCornerShape(6.dp)).border(1.dp, Color(0xFF343740), RoundedCornerShape(6.dp)).clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) { Text("＋  Add video", color = Muted, fontSize = 12.sp) }
+}
+
+@Composable
+private fun AddClip(onClick: () -> Unit) {
+    Box(
+        Modifier.width(52.dp).height(78.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xFF1B1D22)).clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) { Text("+", color = Color.White, fontSize = 28.sp) }
+}
+
+@Composable
+private fun PropertyPanel(title: String, value: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().height(54.dp).background(Color(0xFF111216)).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(title, color = Color.White, fontSize = 12.sp, modifier = Modifier.width(62.dp))
+        Slider(value = value, onValueChange = onChange, valueRange = range, modifier = Modifier.weight(1f))
+        Text(String.format("%.2f", value), color = Muted, fontSize = 11.sp, modifier = Modifier.padding(start = 8.dp))
+    }
+}
+
+@Composable
+private fun EditorToolBar(selectedTool: String, onTool: (String) -> Unit) {
+    val tools = listOf(
+        "Trim" to "✂", "Split" to "Ⅱ", "Speed" to "1×", "Volume" to "◖",
+        "Filter" to "◌", "FX" to "✦", "Text" to "T", "Sticker" to "◇",
+        "Crop" to "⌗", "Rotate" to "↻", "Mirror" to "◫", "Flip" to "▱",
+        "BG" to "▧", "Blur" to "▒", "Opacity" to "◉", "Zoom" to "↗",
+        "TTS" to "A", "Mosaic" to "▦"
+    )
+
+    Row(
+        Modifier.fillMaxWidth().height(92.dp).background(Background).horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        tools.forEach { (name, icon) ->
+            Column(
+                Modifier.width(64.dp).fillMaxHeight().clickable { onTool(name) }.padding(vertical = 7.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Box(
+                    Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).background(if (name == selectedTool) Color(0xFF292C33) else Color.Transparent),
+                    contentAlignment = Alignment.Center
+                ) { Text(icon, color = Color.White, fontSize = 19.sp) }
+                Text(name, color = if (name == selectedTool) Color.White else Muted, fontSize = 9.sp, maxLines = 2)
+            }
+        }
+    }
+}
